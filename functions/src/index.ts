@@ -1,0 +1,1 @@
+export { documentScore } from './api/produce-document-score'
