@@ -7,6 +7,7 @@ const NUM_ROWS = 15;
 const MAX_NUM = 100;
 
 const TOP_PADDING = 30;
+const CLUSTER_WIDTH = 30;
 
 const {
   computer_vision: subscriptionKey,
@@ -29,11 +30,17 @@ const topGroup = Array(NUM_COLUMNS).fill(null)
 const leftGroup = Array(NUM_ROWS).fill(null)
   .map((_, i) => i + 1)
 
+const gridSystem = leftGroup.map(
+  i => Array(NUM_COLUMNS).fill(null)
+    .map((_, j) => (15 * j) + i)
+).reduce((acc, curr) => [...acc, ...curr], [])
+
+console.log(gridSystem)
+
 export const documentScore = functions.https.onRequest(
   async ({ body }, response) => {
     const { url } = JSON.parse(body);
     console.log(url)
-
 
     const cvResponse = await fetch(AZURE_CV_ENDPOINT, {
       method: 'POST',
@@ -99,17 +106,36 @@ export const documentScore = functions.https.onRequest(
       const curr = filteredTopGroup[i]
       const next = filteredTopGroup[i + 1]
 
-      const deltaX = x(numberTermsMap[next]) - x(numberTermsMap[curr])
+      const deltaX = Math.abs(x(numberTermsMap[next]) - x(numberTermsMap[curr]))
       columnWidth += deltaX
     }
 
     columnWidth /= filteredTopGroup.length;
 
-    response.send({
-      bestTop,
-      bestLeft,
-      columnWidth
-    })
+    const clusteredRowHeights = gridSystem.reduce(
+      (acc, c) => {
+        const bb = numberTermsMap[c]
+
+        if (!bb) {
+          return acc
+        }
+
+        const _y = y(bb)
+
+        const clusterKey = Object.keys(acc).find(
+          cluster => Math.abs(Number(_y) - Number(cluster)) <= CLUSTER_WIDTH
+        );
+
+        if (clusterKey) {
+          acc[clusterKey].push(bb)
+        } else {
+          acc[_y] = [ bb ]
+        }
+        return acc
+      }
+    , {})
+
+    response.send(clusteredRowHeights)
 
     // const bestTop = {}
 
