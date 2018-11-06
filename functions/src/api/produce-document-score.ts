@@ -1,4 +1,5 @@
 import * as functions from 'firebase-functions';
+
 import fetch from 'node-fetch'
 
 const NUM_COLUMNS = 7;
@@ -135,7 +136,18 @@ export const documentScore = functions.https.onRequest(
       }
     , {})
 
-    response.send(clusteredRowHeights)
+    const averageRowHeights = Object.keys(clusteredRowHeights)
+      .map(k => clusteredRowHeights[k])
+      .map(
+        cluster => cluster.reduce((a, c) => a + y(c), 0) / cluster.length
+      ).sort()
+
+    response.send(averageRowHeights)
+
+
+    averageRowHeights.forEach(i => {
+
+    })
 
     // const bestTop = {}
 

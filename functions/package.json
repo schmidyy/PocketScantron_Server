@@ -17,7 +17,9 @@
   "dependencies": {
     "firebase-admin": "~6.0.0",
     "firebase-functions": "^2.0.3",
-    "node-fetch": "^2.2.0"
+    "jimp": "^0.5.6",
+    "node-fetch": "^2.2.0",
+    "tinycolor2": "^1.4.1"
   },
   "devDependencies": {
     "tslint": "~5.8.0",
