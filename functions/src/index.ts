@@ -1,1 +1,1 @@
-export { documentScore } from './api/produce-document-score'
+export { documentScore } from './api/document-score'

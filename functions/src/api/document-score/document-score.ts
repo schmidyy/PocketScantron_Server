@@ -4,53 +4,10 @@ import fetch from 'node-fetch'
 
 import jimp = require('jimp')
 import tinycolor = require("tinycolor2");
+import { subscriptionKey, NUM_COLUMNS, NUM_ROWS, AZURE_CV_ENDPOINT, MAX_NUM, CLUSTER_WIDTH, letters, gridSystem, x, y, TOP_PADDING } from '../../util';
 
-
-const NUM_COLUMNS = 7;
-const NUM_ROWS = 15;
-
-const MAX_NUM = 100;
-
-const TOP_PADDING = 30;
-const CLUSTER_WIDTH = 30;
-
-const letters = ['A', 'B', 'C', 'D', 'E']
-
-const {
-  computer_vision: subscriptionKey,
-  endpoint: AZURE_CV_ENDPOINT,
-} = functions.config().azure
-
-export function x (bb): number {
-  const [ x, _, __, ___ ] = bb.split(',')
-  return Number(x)
-}
-
-export function y (bb): number {
-  const [ _, y, __, ___ ] = bb.split(',')
-  return Number(y)
-}
-
-export function toHex(d) {
-  return  ("0"+(Number(d).toString(16))).slice(-2).toUpperCase()
-}
-
-const topGroup = Array(NUM_COLUMNS).fill(null)
-  .map((_, i) => (15 * i) + 1)
-
-const leftGroup = Array(NUM_ROWS).fill(null)
-  .map((_, i) => i + 1)
-
-const gridSystem = leftGroup.map(
-  i => Array(NUM_COLUMNS).fill(null)
-    .map((_, j) => (15 * j) + i)
-).reduce((acc, curr) => [...acc, ...curr], [])
-
-// console.log(gridSystem)
-
-export const documentScore = functions.https.onRequest(
-  async ({ body }, response) => {
-    const { url } = JSON.parse(body);
+export async function scoreDocument (body: string, response: functions.Response) {
+    const { url, numQuestions } = JSON.parse(body);
     // console.log(url)
 
     const cvResponse = await fetch(AZURE_CV_ENDPOINT, {
@@ -165,49 +122,88 @@ export const documentScore = functions.https.onRequest(
 
     averageHeight /= averageRowY.length
 
-    image.blur(15)
+    // image.blur(15)
     console.log('blurred')
     const chosenAnswers = []
 
     console.log('avg-width', averageWidth)
     console.log('avg-height', averageHeight)
 
-    averageRowY.forEach(y => {
-      averageColX.forEach(x => {
-        // image.pixelate(averageHeight / 2, x, y, averageWidth, averageHeight)
-        
-        let darkest = {
-          index: -1,
-          luminance: Infinity,
-        };
+    console.log('averageRowY', averageRowY.length)
+    console.log('averageColX', averageColX.length)
 
-        for (let i = 5; i > 0; i--) {
-          const pixelColor = image.getPixelColor(
-            x + (averageWidth / i) - 30,
-            y + (averageHeight / 2)
-          )
-          // console.log(pixelColor)
+    let currQuestion = 0
 
-          const { r, g, b, a } = jimp.intToRGBA(pixelColor)
+    averageColX.forEach(x => {
+      averageRowY.forEach(y => {
+         // image.clone().crop(x + 30, y - (averageHeight / 2), averageWidth - 30, averageHeight).write(`./${Math.floor(x)}-${Math.floor(y)}-${Math.floor(averageWidth)}-${Math.floor(averageHeight)}.jpg`)
+        currQuestion += 1
 
-          const pixelLuminance = tinycolor(`rgba(${r}, ${g}, ${b}, ${a})`).getLuminance()
-          console.log(pixelLuminance)
-          if (darkest.luminance > pixelLuminance) {
-            darkest = {
-              index: 5 - i,
-              luminance: pixelLuminance
-            }
-          }
+        if (currQuestion <= numQuestions) {
+          const estimatedLetterGuess = darkestArea(image, x + 30, y - (averageHeight / 2), averageWidth - 35, averageHeight)
+
+          chosenAnswers.push({
+            current_question: currQuestion,
+            letter_guess: estimatedLetterGuess
+          })
         }
-        console.log(darkest)
-        chosenAnswers.push(letters[darkest.index])
       })
     })
-
     response.send(chosenAnswers)
+}
 
-    // const bestTop = {}
-
-    // const bestNull = {}
+function darkestArea(image: jimp, x: number, y: number, width: number, height: number): string {
+  const segmentWidth = width / 5
+  const segmentHeight = height / 20
+  
+  const buckets = {}
+  
+  for (let i = 0; i < 5; i++) {
+    buckets[x + (segmentWidth * (i + 1))] = 0
   }
-);
+
+  const sortedBucketIndices = Object.keys(buckets).sort((a, b) => Number(a) - Number(b))
+  
+  // Scan across subsection
+  for (let i = x; i < x + width; i++) {
+    for (let j = 0; j < 20; j++) {
+      const pixelColor = image.getPixelColor(i, y + (segmentHeight * (j + 1)))
+
+      const { r, g, b, a } = jimp.intToRGBA(pixelColor)
+      const pixelLuminance = tinycolor(`rgba(${r}, ${g}, ${b}, ${a})`).getLuminance()
+      
+      const bucketIndex = sortedBucketIndices.find(
+        bucketValue => i < Number(bucketValue)
+      )
+
+      buckets[bucketIndex] += pixelLuminance
+    }
+  }
+
+  console.log(buckets)
+
+
+  // let bestIndex = 0
+
+  // for (let i = 0; i < sortedBucketIndices.length; i++) {
+  //   if (buckets[] 
+  // }
+
+
+  const discoveredIndex = sortedBucketIndices.reduce(
+    (minBucketIndex, currentBucketValue, currentBucketIndex) => {
+      if (minBucketIndex === null) {
+        return currentBucketIndex
+      }
+      if (buckets[sortedBucketIndices[minBucketIndex]] > buckets[currentBucketValue]) {
+        return currentBucketIndex
+      }
+
+      return minBucketIndex
+    }
+  , null)
+
+  console.log(discoveredIndex)
+
+  return letters[discoveredIndex]
+}
