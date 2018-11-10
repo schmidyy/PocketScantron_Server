@@ -6,9 +6,7 @@ import jimp = require('jimp')
 import tinycolor = require("tinycolor2");
 import { subscriptionKey, AZURE_CV_ENDPOINT, MAX_NUM, CLUSTER_WIDTH, letters, gridSystem, getX, getY } from '../../util';
 
-export async function scoreDocument (body: string, response: functions.Response) {
-    const { url, numQuestions } = JSON.parse(body);
-
+export async function scoreDocument ({ url, numQuestions }: { url: string, numQuestions: number }, response: functions.Response) {
     const cvResponse = await fetch(AZURE_CV_ENDPOINT, {
       method: 'POST',
       headers: {
@@ -22,6 +20,7 @@ export async function scoreDocument (body: string, response: functions.Response)
 
     if (!cvResult.regions) {
       response.status(405).send({ message: 'invalid response (custom error)'});
+      return
     }
 
     const terms = cvResult.regions.reduce((regionAcc, region) => [
@@ -130,7 +129,7 @@ export async function scoreDocument (body: string, response: functions.Response)
          // image.clone().crop(x + 30, y - (averageHeight / 2), averageWidth - 30, averageHeight).write(`./${Math.floor(x)}-${Math.floor(y)}-${Math.floor(averageWidth)}-${Math.floor(averageHeight)}.jpg`)
         currQuestion += 1
 
-        if (currQuestion <= numQuestions) {
+        if (currQuestion <= Number(numQuestions)) {
           const estimatedLetterGuess = darkestArea(image, x + 30, y - (averageHeight / 2), averageWidth - 35, averageHeight)
 
           chosenAnswers.push({
