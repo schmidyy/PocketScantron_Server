@@ -15,12 +15,12 @@ export const {
     endpoint: AZURE_CV_ENDPOINT,
 } = functions.config().azure
 
-export function x (bb): number {
+export function getX (bb): number {
   const [ x, _, __, ___ ] = bb.split(',')
   return Number(x)
 }
 
-export function y (bb): number {
+export function getY (bb): number {
   const [ _, y, __, ___ ] = bb.split(',')
   return Number(y)
 }

@@ -4,11 +4,10 @@ import fetch from 'node-fetch'
 
 import jimp = require('jimp')
 import tinycolor = require("tinycolor2");
-import { subscriptionKey, NUM_COLUMNS, NUM_ROWS, AZURE_CV_ENDPOINT, MAX_NUM, CLUSTER_WIDTH, letters, gridSystem, x, y, TOP_PADDING } from '../../util';
+import { subscriptionKey, AZURE_CV_ENDPOINT, MAX_NUM, CLUSTER_WIDTH, letters, gridSystem, getX, getY } from '../../util';
 
 export async function scoreDocument (body: string, response: functions.Response) {
     const { url, numQuestions } = JSON.parse(body);
-    // console.log(url)
 
     const cvResponse = await fetch(AZURE_CV_ENDPOINT, {
       method: 'POST',
@@ -55,7 +54,7 @@ export async function scoreDocument (body: string, response: functions.Response)
           return acc
         }
 
-        const _y = y(bb)
+        const _y = getY(bb)
 
         const clusterKey = Object.keys(acc).find(
           cluster => Math.abs(Number(_y) - Number(cluster)) <= CLUSTER_WIDTH
@@ -78,7 +77,7 @@ export async function scoreDocument (body: string, response: functions.Response)
           return acc
         }
 
-        const _x = x(bb)
+        const _x = getX(bb)
 
         const clusterKey = Object.keys(acc).find(
           cluster => Math.abs(Number(_x) - Number(cluster)) <= CLUSTER_WIDTH
@@ -96,13 +95,13 @@ export async function scoreDocument (body: string, response: functions.Response)
     const averageRowY = Object.keys(clusteredRowY)
       .map(k => clusteredRowY[k])
       .map(
-        cluster => Number(cluster.reduce((a, c) => a + y(c), 0) / cluster.length)
+        cluster => Number(cluster.reduce((a, c) => a + getY(c), 0) / cluster.length)
       ).sort((a, b) => a - b)
 
     const averageColX = Object.keys(clusteredColX)
       .map(k => clusteredColX[k])
       .map(
-        cluster => Number(cluster.reduce((a, c) => a + x(c), 0) / cluster.length)
+        cluster => Number(cluster.reduce((a, c) => a + getX(c), 0) / cluster.length)
       ).sort((a, b) => a - b)
 
     const image = await jimp.read(url)
@@ -122,15 +121,7 @@ export async function scoreDocument (body: string, response: functions.Response)
 
     averageHeight /= averageRowY.length
 
-    // image.blur(15)
-    console.log('blurred')
     const chosenAnswers = []
-
-    console.log('avg-width', averageWidth)
-    console.log('avg-height', averageHeight)
-
-    console.log('averageRowY', averageRowY.length)
-    console.log('averageColX', averageColX.length)
 
     let currQuestion = 0
 
@@ -180,16 +171,6 @@ function darkestArea(image: jimp, x: number, y: number, width: number, height: n
     }
   }
 
-  console.log(buckets)
-
-
-  // let bestIndex = 0
-
-  // for (let i = 0; i < sortedBucketIndices.length; i++) {
-  //   if (buckets[] 
-  // }
-
-
   const discoveredIndex = sortedBucketIndices.reduce(
     (minBucketIndex, currentBucketValue, currentBucketIndex) => {
       if (minBucketIndex === null) {
@@ -202,8 +183,6 @@ function darkestArea(image: jimp, x: number, y: number, width: number, height: n
       return minBucketIndex
     }
   , null)
-
-  console.log(discoveredIndex)
 
   return letters[discoveredIndex]
 }
